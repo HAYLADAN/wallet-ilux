@@ -179,10 +179,14 @@
     }
 
     function buildUrl(name, amt){
-      const garzonParam = esc(name);
-      const montoParam = Number(amt) || 0;
-      const fecha = (new Date()).toISOString();
-      return './wallet_ilux_propina_meter.html?garzon='+garzonParam+'&monto='+montoParam+'&fecha='+esc(fecha);
+      const garzon = encodeURIComponent(name);
+      const monto = Number(amt) || 0;
+      const fecha = encodeURIComponent(new Date().toISOString());
+  
+      return 'https://hayladan.github.io/wallet-ilux/wallet_ilux_propina_meter.html'
+          + '?garzon=' + garzon
+          + '&monto=' + monto
+          + '&fecha=' + fecha;
     }
 
     function renderQr(url){
