@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wallet ILUX — Panel Administrador (Propina)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#050505; --card:#0f0f10; --muted:#bdbdbd;
+      --gold1:#ffcc47; --gold2:#ffd86b; --success:#4ade80;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#020202);color:#eee;min-height:100vh;padding:24px;display:flex;justify-content:center}
+    .wrap{width:980px;max-width:98%}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--gold1),var(--gold2));display:flex;align-items:center;justify-content:center;color:#111;font-weight:800}
+    h1{margin:0;font-size:20px}
+    .sub{font-size:12px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:18px;align-items:start}
+
+    .panel{background:var(--card);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.04)}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+    input, select, textarea{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:8px;color:#eee}
+    button{cursor:pointer;border:0;padding:10px;border-radius:10px;font-weight:700}
+    .btn-gold{background:linear-gradient(135deg,var(--gold1),var(--gold2));color:#111}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px}
+    th{color:var(--muted);font-weight:600;font-size:12px}
+
+    .small{font-size:13px;color:var(--muted)}
+    .note{font-size:12px;color:var(--muted);margin-top:8px}
+
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">ADM</div>
+        <div>
+          <h1>Panel Administrador — Wallet ILUX</h1>
+          <div class="sub">Asignar propinas al personal | Balance infinito (admin)</div>
+        </div>
+      </div>
+      <div class="sub">Offline • localStorage</div>
+    </header>
+
+    <main class="grid">
+      <section class="panel">
+        <h3>Acciones rápidas</h3>
+
+        <div class="field">
+          <label>Seleccionar trabajador</label>
+          <select id="selUser"></select>
+        </div>
+
+        <div class="field">
+          <label>Monto a asignar</label>
+          <input id="allocAmount" type="number" value="5000" />
+        </div>
+
+        <div class="field">
+          <label>Descripción</label>
+          <input id="allocDesc" type="text" placeholder="Propina diaria" />
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-gold" id="btnGive">Dar monto</button>
+          <button class="btn-ghost" id="btnGiveMany">Dar a todos (misma cantidad)</button>
+        </div>
+
+        <div class="note">Como administrador tienes un balance "infinito": al asignar, se crea un movimiento de tipo <strong>ingreso</strong> en la cuenta del trabajador seleccionado.</div>
+
+        <hr style="margin:14px 0;border-color:rgba(255,255,255,0.03)">
+
+        <h4>Crear nuevo trabajador</h4>
+        <div class="field">
+          <label>Id (corto, minúsculas)</label>
+          <input id="newId" type="text" placeholder="ej: pedro" />
+        </div>
+        <div class="field">
+          <label>Nombre completo</label>
+          <input id="newName" type="text" placeholder="Pedro González" />
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-gold" id="btnCreate">Crear trabajador</button>
+          <button class="btn-ghost" id="btnSync">Refrescar lista</button>
+        </div>
+
+        <div class="note">Los usuarios creados aquí aparecen en la app principal y recibirán los movimientos asignados por el administrador.</div>
+      </section>
+
+      <aside class="panel">
+        <h3>Historial de asignaciones (admin)</h3>
+        <div id="allocsWrap" style="max-height:460px;overflow:auto;padding-right:6px">
+          <table id="allocsTable">
+            <thead><tr><th>Fecha</th><th>To</th><th>Monto</th><th>Descripción</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <h4>Usuarios registrados</h4>
+        <div id="usersWrap" style="max-height:220px;overflow:auto;padding-right:6px">
+          <table id="usersTable">
+            <thead><tr><th>Id</th><th>Nombre</th><th>#Movs</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </aside>
+    </main>
+
+    <footer style="margin-top:18px;color:var(--muted);font-size:13px;text-align:center">Wallet ILUX — Admin panel • LocalStorage</footer>
+  </div>
+
+<script>
+  const USERS_LIST = 'wallet_users';
+  const ADMIN_ALLOCS = 'admin_allocs';
+
+  // Helpers
+  const $ = sel => document.querySelector(sel);
+  function loadUsers(){ return JSON.parse(localStorage.getItem(USERS_LIST) || '[]'); }
+  function saveUsers(users){ localStorage.setItem(USERS_LIST, JSON.stringify(users)); }
+  function getUserById(id){ return loadUsers().find(u=>u.id===id); }
+  function saveUser(user){
+    const users = loadUsers();
+    const idx = users.findIndex(x=>x.id===user.id);
+    if(idx>-1) users[idx]=user; else users.push(user);
+    saveUsers(users);
+  }
+
+  function loadAllocs(){ return JSON.parse(localStorage.getItem(ADMIN_ALLOCS) || '[]'); }
+  function saveAllocs(a){ localStorage.setItem(ADMIN_ALLOCS, JSON.stringify(a)); }
+
+  // UI population
+  function populateUsersDropdown(){
+    const sel = $('#selUser');
+    sel.innerHTML = '';
+    const users = loadUsers();
+    if(!users.length){
+      const opt = document.createElement('option'); opt.value=''; opt.text='-- sin usuarios --'; sel.appendChild(opt); return;
+    }
+    users.forEach(u=>{
+      const o = document.createElement('option'); o.value=u.id; o.text = u.name + ' ('+u.id+')'; sel.appendChild(o);
+    });
+  }
+
+  function renderUsersTable(){
+    const tbody = $('#usersTable tbody');
+    tbody.innerHTML = '';
+    loadUsers().forEach(u=>{
+      const tr = document.createElement('tr');
+      const movs = Array.isArray(u.movimientos)?u.movimientos.length:0;
+      tr.innerHTML = `<td>${u.id}</td><td>${u.name}</td><td>${movs}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderAllocs(){
+    const tbody = $('#allocsTable tbody');
+    tbody.innerHTML = '';
+    const allocs = loadAllocs().slice().reverse();
+    allocs.forEach(a=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="white-space:nowrap">${new Date(a.fecha).toLocaleString()}</td><td>${a.to}</td><td>${formatMoney(a.monto)}</td><td>${a.descripcion||''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function formatMoney(n){ return '$ ' + Number(n).toLocaleString('es-CL'); }
+
+  // Admin actions
+  function giveToUser(userId, amount, desc){
+    const user = getUserById(userId);
+    if(!user) return false;
+    const movimiento = { id: 'adm_'+Date.now(), fecha: new Date().toISOString(), monto: Number(amount), tipo: 'ingreso', descripcion: desc || 'Asignación admin' };
+    user.movimientos = user.movimientos || [];
+    user.movimientos.push(movimiento);
+    saveUser(user);
+
+    const allocs = loadAllocs();
+    allocs.push({ fecha: new Date().toISOString(), to: userId, monto: Number(amount), descripcion: desc||'' });
+    saveAllocs(allocs);
+    return true;
+  }
+
+  function giveToAll(amount, desc){
+    const users = loadUsers();
+    users.forEach(u=>{
+      giveToUser(u.id, amount, desc);
+    });
+  }
+
+  // Create user
+  function createUser(){
+    const id = $('#newId').value.trim().toLowerCase();
+    const name = $('#newName').value.trim();
+    if(!id || !name){ alert('Id y nombre son requeridos'); return; }
+    const users = loadUsers();
+    if(users.find(u=>u.id===id)){ alert('Ya existe un usuario con ese id'); return; }
+    const user = { id: id, name: name, pin: null, movimientos: [], targets: { day:20000, week:100000, month:400000 } };
+    users.push(user);
+    saveUsers(users);
+    $('#newId').value=''; $('#newName').value='';
+    populateUsersDropdown(); renderUsersTable();
+    alert('Trabajador creado');
+  }
+
+  // Events
+  $('#btnCreate').onclick = createUser;
+  $('#btnSync').onclick = ()=>{ populateUsersDropdown(); renderUsersTable(); renderAllocs(); };
+  $('#btnGive').onclick = ()=>{
+    const uid = $('#selUser').value;
+    const amt = Number($('#allocAmount').value) || 0;
+    const desc = $('#allocDesc').value.trim() || 'Propina asignada';
+    if(!uid){ alert('Selecciona un trabajador'); return; }
+    if(amt<=0){ alert('Ingresa un monto válido'); return; }
+    const ok = giveToUser(uid, amt, desc);
+    if(ok){ alert('Monto asignado'); renderUsersTable(); renderAllocs(); }
+  };
+  $('#btnGiveMany').onclick = ()=>{
+    const amt = Number($('#allocAmount').value) || 0;
+    const desc = $('#allocDesc').value.trim() || 'Propina asignada';
+    if(amt<=0){ alert('Ingresa un monto válido'); return; }
+    if(!confirm('Asignar $'+amt.toLocaleString()+' a todos los trabajadores?')) return;
+    giveToAll(amt, desc);
+    alert('Montos asignados a todos');
+    renderUsersTable(); renderAllocs();
+  };
+
+  // Init sample users if none
+  function initSample(){
+    const users = loadUsers();
+    if(!users.length){
+      const sample = [
+        { id:'javier', name:'Javier', pin:null, movimientos:[], targets:{day:20000,week:100000,month:400000} },
+        { id:'maria', name:'María', pin:null, movimientos:[], targets:{day:20000,week:100000,month:400000} },
+        { id:'pedro', name:'Pedro', pin:null, movimientos:[], targets:{day:20000,week:100000,month:400000} }
+      ];
+      saveUsers(sample);
+    }
+  }
+
+  // Boot
+  initSample();
+  populateUsersDropdown();
+  renderUsersTable();
+  renderAllocs();
+</script>
+</body>
+</html>
