@@ -630,5 +630,18 @@ function openQRScanner() {
 
 document.getElementById("btnScanQR").onclick = openQRScanner;
 </script>
+	<script>
+// --- FUNCIÓN DEFINITIVA PARA GENERAR EL QR CORRECTO ---
+function buildUrl(name, amt){
+  const garzon = encodeURIComponent(name);
+  const monto = Number(amt) || 0;
+  const fecha = encodeURIComponent(new Date().toISOString());
+
+  return 'https://hayladan.github.io/wallet-ilux/wallet_ilux_propina_meter.html'
+    + '?garzon=' + garzon
+    + '&monto=' + monto
+    + '&fecha=' + fecha;
+}
+</script>
 </body>
 </html>
