@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wallet ILUX — Propina Meter (Círculo)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#050505; --card:#0f0f10; --glass: rgba(255,255,255,0.03);
+      --gold1:#ffcc47; --gold2:#ffd86b; --muted:#bdbdbd; --accent:#ffd54a;
+      --success:#4ade80; --danger:#ff6b6b;
+      --radius:18px;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:linear-gradient(180deg,var(--bg),#040404);color:#eee;
+      -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+      display:flex;align-items:flex-start;justify-content:center;padding:18px;
+    }
+    .app{width:980px;max-width:98%;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--gold1),var(--gold2));display:flex;align-items:center;justify-content:center;color:#111;font-weight:800}
+    .title{font-size:18px;font-weight:700}
+    .sub{font-size:12px;color:var(--muted)}
+
+    .grid{display:grid;grid-template-columns:480px 1fr;gap:18px;align-items:start}
+
+    /* Circle widget */
+    .circle-panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:22px;border-radius:20px;border:1px solid rgba(255,255,255,0.04);backdrop-filter: blur(6px);position:relative;}
+    .meter-wrap{display:flex;gap:18px;align-items:center;justify-content:center;flex-direction:column}
+    .meter{position:relative;width:320px;height:320px;display:flex;align-items:center;justify-content:center}
+    .meter svg{transform:rotate(-90deg)}
+    .meter .center{
+      position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;
+    }
+    .meter .balance{font-size:30px;font-weight:800}
+    .meter .pct{font-size:13px;color:var(--muted);margin-top:6px}
+
+    .controls{display:flex;gap:8px;margin-top:12px;align-items:center;justify-content:center}
+    .seg{display:flex;gap:6px;background:rgba(255,255,255,0.02);padding:6px;border-radius:999px}
+    .seg button{background:transparent;border:0;color:var(--muted);padding:8px 12px;border-radius:999px;cursor:pointer}
+    .seg button.active{background:linear-gradient(90deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));color:#fff;border:1px solid rgba(255,255,255,0.04)}
+
+    .mini-stats{display:flex;gap:10px;margin-top:16px;justify-content:center}
+    .mini{padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);min-width:110px;text-align:center}
+    .mini .num{font-weight:700}
+
+    /* Right column */
+    .panel{background:var(--card);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+    .panel h4{margin:0 0 8px 0;font-size:13px}
+    .movements{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto;padding-right:6px}
+    .mv{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:10px}
+    .pill{width:44px;height:44px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);display:flex;align-items:center;justify-content:center}
+    .mv .meta{font-size:13px}
+    .mv .amt{font-weight:700}
+    .amt.in{color:var(--success)}
+    .amt.out{color:var(--danger)}
+
+    .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    button{cursor:pointer;border:0;padding:10px;border-radius:10px;font-weight:700}
+    .btn-gold{background:linear-gradient(135deg,var(--gold1),var(--gold2));color:#111}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+
+    /* Confetti canvas */
+    #confettiCanvas{position:absolute;inset:0;pointer-events:none}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1200}
+    .modal{width:420px;background:linear-gradient(180deg,#0f0f10,#0b0b0b);padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+    input[type="text"], input[type="number"], input[type="date"]{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:10px;color:#eee}
+
+    footer{margin-top:18px;color:var(--muted);font-size:12px;text-align:center}
+
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr;align-items:start}
+      .meter{width:260px;height:260px}
+    }
+  </style>
+</head>
+<body>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="
+  position:fixed; inset:0; background:#000; display:flex;
+  align-items:center; justify-content:center; z-index:9999;">
+  
+  <div style="background:#111; padding:20px; border-radius:10px;
+    width:90%; max-width:350px; text-align:center;">
+    
+    <h2 style="margin-bottom:10px;">Ingresar a Wallet ILUX</h2>
+
+    <label style="color:#bbb;">Usuario</label>
+    <select id="loginUser" style="width:100%; padding:10px; margin-bottom:10px;"></select>
+
+    <label style="color:#bbb;">PIN</label>
+    <input id="loginPin" type="password" maxlength="4"
+      style="width:100%; padding:10px; margin-bottom:15px; text-align:center; font-size:18px;" />
+
+    <button id="btnLogin" style="width:100%; padding:12px; background:#ffd86b; color:#000; border:0; border-radius:8px;">
+      Entrar
+    </button>
+
+    <p id="loginError" style="color:#ff7676; margin-top:10px; display:none;">
+      PIN incorrecto
+    </p>
+  </div>
+</div>
+<!-- 🚨 CIERRE DEL LOGIN AQUÍ 🚨 -->
+
+  <div class="app" id="app">
+    <header>
+      <div class="brand">
+        <div class="logo">IL</div>
+        <div>
+          <div class="title">Wallet ILUX</div>
+          <div class="sub">Propina Meter • Círculo dinámico</div>
+        </div>
+      </div>
+      <button id="btnLogout" class="btn-ghost" style="padding:6px 12px;font-size:12px;">
+  Cerrar sesión
+</button>
+    </header>
+
+    <main class="grid">
+      <section class="circle-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;color:var(--muted)">Hola, <strong id="userName">Javier</strong></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:6px" id="targetLabel">Objetivo semanal: <strong id="targetAmount">$ 100.000</strong></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn-ghost" id="btnSetTarget">Ajustar objetivo</button>
+            <button class="btn-ghost" id="btnExport">Exportar</button>
+          </div>
+        </div>
+
+        <div class="meter-wrap" style="margin-top:12px">
+          <div class="meter" aria-hidden="false">
+            <svg width="320" height="320" viewBox="0 0 200 200" id="progressSvg" role="img" aria-label="Progreso de propinas">
+              <defs>
+                <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="0%">
+                  <stop offset="0%" stop-color="#ffcc47" />
+                  <stop offset="100%" stop-color="#ffd86b" />
+                </linearGradient>
+                <filter id="blurMe" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2.5" />
+                </filter>
+              </defs>
+              <!-- background circle -->
+              <circle cx="100" cy="100" r="72" stroke="rgba(255,255,255,0.04)" stroke-width="16" fill="none"></circle>
+              <!-- animated progress -->
+              <circle cx="100" cy="100" r="72" stroke="url(#g1)" stroke-width="16" stroke-linecap="round" fill="none"
+                      stroke-dasharray="452" stroke-dashoffset="452" id="progressCircle" style="filter:drop-shadow(0 6px 10px rgba(255,180,60,0.06));transition:stroke-dashoffset 800ms cubic-bezier(.2,.9,.28,1),transform 400ms;"></circle>
+              <!-- subtle glow -->
+              <circle cx="100" cy="100" r="78" stroke="rgba(255,200,100,0.03)" stroke-width="6" fill="none"></circle>
+            </svg>
+
+            <div class="center" id="centerInfo">
+              <div class="balance" id="centerAmount">$ 0</div>
+              <div class="pct" id="centerPct">0% del objetivo</div>
+            </div>
+
+            <canvas id="confettiCanvas"></canvas>
+          </div>
+
+          <div class="controls">
+            <div class="seg" role="tablist" aria-label="Periodo">
+              <button class="active" data-mode="day">Hoy</button>
+              <button data-mode="week">Semana</button>
+              <button data-mode="month">Mes</button>
+            </div>
+            <div style="width:8px"></div>
+            <button class="btn-gold" id="btnAdd">+ Agregar ingreso</button>
+            <button class="btn-ghost" id="btnRetiro">- Retiro</button>
+	    <button class="btn-gold" id="btnScanQR">📷 Escanear QR</button>
+          </div>
+
+          <div class="mini-stats">
+            <div class="mini">
+              <div style="font-size:12px;color:var(--muted)">Hoy</div>
+              <div class="num" id="statToday">$ 0</div>
+            </div>
+            <div class="mini">
+              <div style="font-size:12px;color:var(--muted)">Semana</div>
+              <div class="num" id="statWeek">$ 0</div>
+            </div>
+            <div class="mini">
+              <div style="font-size:12px;color:var(--muted)">Mes</div>
+              <div class="num" id="statMonth">$ 0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside>
+        <div class="panel">
+          <h4>Últimos movimientos</h4>
+          <div class="movements" id="movements"></div>
+
+          <div class="actions">
+            <button class="btn-gold" id="btnImport">Importar JSON</button>
+            <button class="btn-ghost" id="btnClear">Borrar todo</button>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="panel" style="margin-top:12px">
+          <h4>Ayuda rápida</h4>
+          <div style="font-size:13px;color:var(--muted);line-height:1.4">
+            • El círculo muestra progreso sobre el objetivo seleccionado (Hoy/Semana/Mes).<br>
+            • Usa <strong>Ajustar objetivo</strong> para cambiar la meta. <br>
+            • La app funciona 100% offline con localStorage.
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>Wallet ILUX — Propina Meter • Generado</footer>
+
+    <div id="modalRoot" aria-live="polite"></div>
+
+    <script>
+      // Keys & helpers
+      const USERS_LIST = 'wallet_users';
+      const USER_KEY = 'wallet_active_user';
+      const DEFAULT_TARGETS = { day: 20000, week: 100000, month: 400000 };
+
+      const $ = (s) => document.querySelector(s);
+      const formatMoney = n => '$ ' + Number(n).toLocaleString('es-CL');
+
+      // Initialize sample user
+      function initSample(){
+  let users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+
+  // Si nunca se creó una base de datos, crear todos los colaboradores
+  if(!users.length){
+    const baseUsers = [
+      { id: "fernando", name: "Fernando" },
+      { id: "javier", name: "Javier" },
+      { id: "jose", name: "José" },
+
+      { id: "andres_bartender", name: "Andrés (Bartender)" },
+
+      { id: "ramon", name: "Ramón" },
+      { id: "manuela", name: "Manuela" },
+
+      { id: "johana", name: "Johana" },
+      { id: "andreina", name: "Andreina" },
+      { id: "marialba", name: "Marialba" },
+
+      { id: "andres_copero", name: "Andrés (Copero)" }
+    ];
+
+    users = baseUsers.map(u => ({
+      ...u,
+      pin: null,
+      movimientos: [],
+      targets: DEFAULT_TARGETS
+    }));
+
+    localStorage.setItem(USERS_LIST, JSON.stringify(users));
+    localStorage.setItem(USER_KEY, users[0].id);
+  }
+}
+
+      function getActiveUser(){
+        const uid = localStorage.getItem(USER_KEY);
+        const users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+        return users.find(u=>u.id===uid) || users[0];
+      }
+      function saveUser(user){
+        const users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+        const idx = users.findIndex(u=>u.id===user.id);
+        if(idx>-1) users[idx]=user; else users.push(user);
+        localStorage.setItem(USERS_LIST, JSON.stringify(users));
+        localStorage.setItem(USER_KEY, user.id);
+      }
+
+      // Compute totals by period
+      function totalsForPeriod(user){
+        const now = Date.now();
+        const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+        const startWeek = new Date(); startWeek.setDate(startWeek.getDate()- (startWeek.getDay()? startWeek.getDay()-1 : 6)); startWeek.setHours(0,0,0,0); // Mon-based
+        const startMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        let tday=0,tweek=0,tmonth=0;
+        (user.movimientos||[]).forEach(m=>{
+          const ts = new Date(m.fecha).getTime();
+          if(m.tipo==='ingreso') {
+            if(ts >= startOfDay.getTime()) tday += m.monto;
+            if(ts >= startWeek.getTime()) tweek += m.monto;
+            if(ts >= startMonth.getTime()) tmonth += m.monto;
+          }
+        });
+        return {day: tday, week: tweek, month: tmonth};
+      }
+
+      // Rendering & circle logic
+      const progressCircle = document.getElementById('progressCircle');
+      const centerAmount = document.getElementById('centerAmount');
+      const centerPct = document.getElementById('centerPct');
+      const statToday = document.getElementById('statToday');
+      const statWeek = document.getElementById('statWeek');
+      const statMonth = document.getElementById('statMonth');
+      const targetAmountLabel = document.getElementById('targetAmount');
+      const targetLabel = document.getElementById('targetLabel');
+
+      let currentMode = 'week'; // default
+      const CIRCUMFERENCE = 2 * Math.PI * 72; // r=72
+
+      function setProgress(pct){
+        const offset = Math.max(0, CIRCUMFERENCE - (CIRCUMFERENCE * (Math.min(pct,100)/100)));
+        progressCircle.style.strokeDashoffset = offset;
+        // color gradient / thresholds
+        if(pct < 50) progressCircle.style.filter = 'drop-shadow(0 6px 10px rgba(255,80,80,0.06))';
+        else if(pct < 90) progressCircle.style.filter = 'drop-shadow(0 6px 10px rgba(255,180,60,0.08))';
+        else progressCircle.style.filter = 'drop-shadow(0 8px 18px rgba(120,200,100,0.12))';
+      }
+
+      function renderAll(animate=true){
+        const user = getActiveUser();
+        if(!user) return;
+        $('#userName').textContent = user.name;
+        const totals = totalsForPeriod(user);
+        statToday.textContent = formatMoney(totals.day);
+        statWeek.textContent = formatMoney(totals.week);
+        statMonth.textContent = formatMoney(totals.month);
+
+        // target for current mode
+        const target = (user.targets && user.targets[currentMode]) || DEFAULT_TARGETS[currentMode];
+        targetAmountLabel.textContent = formatMoney(target);
+
+        // amount for mode
+        const amount = totals[currentMode];
+        centerAmount.textContent = formatMoney(amount);
+        const pct = target>0 ? Math.round((amount/target)*100) : 0;
+        centerPct.textContent = pct + '% del objetivo';
+
+        // animate circle
+        if(animate){
+          // subtle pulse
+          progressCircle.animate([{transform:'scale(1)'},{transform:'scale(1.02)'},{transform:'scale(1)'}],{duration:700, easing:'ease', iterations:1});
+        }
+        setTimeout(()=> setProgress(pct), 50);
+
+        // movements list
+        const mov = $('#movements');
+        mov.innerHTML = '';
+        const list = (user.movimientos || []).slice().sort((a,b)=> new Date(b.fecha)-new Date(a.fecha));
+        list.forEach(m=>{
+          const d = document.createElement('div');
+          d.className = 'mv';
+          d.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><div class="pill">${m.tipo==='ingreso'?'+':'−'}</div><div><div class="meta">${m.descripcion}</div><div style="font-size:12px;color:var(--muted)">${new Date(m.fecha).toLocaleString()}</div></div></div><div class="amt ${m.tipo==='ingreso'?'in':'out'}">${formatMoney(m.monto)}</div>`;
+          mov.appendChild(d);
+        });
+
+        // trigger confetti if goal reached (only when amount >= target and positive recent)
+        if(amount >= target && target>0){
+          fireConfetti();
+        }
+      }
+
+      // Add movimiento modal
+      function openModal(html, onReady){
+        const root = $('#modalRoot');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'modal-backdrop';
+        wrapper.innerHTML = `<div class="modal">${html}</div>`;
+        wrapper.addEventListener('click', (e)=>{ if(e.target===wrapper) wrapper.remove(); });
+        root.appendChild(wrapper);
+        if(onReady) onReady(wrapper);
+      }
+
+      function addMovimiento(tipo){
+        const html = `
+          <h3>${tipo==='ingreso' ? 'Agregar ingreso' : 'Registrar retiro'}</h3>
+          <div class="field"><label>Monto</label><input id="monto" type="number" value="0" /></div>
+          <div class="field"><label>Descripción</label><input id="desc" type="text" value="${tipo==='ingreso'?'Propina del día':''}" /></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button class="btn-ghost" id="cancelBtn">Cancelar</button>
+            <button class="btn-gold" id="saveBtn">Guardar</button>
+          </div>
+        `;
+        openModal(html, (wrapper)=>{
+          wrapper.querySelector('#cancelBtn').onclick = ()=> wrapper.remove();
+          wrapper.querySelector('#saveBtn').onclick = ()=>{
+            const m = Number(wrapper.querySelector('#monto').value) || 0;
+            const d = wrapper.querySelector('#desc').value || (tipo==='ingreso'?'Propina':'Retiro');
+            const user = getActiveUser();
+            const movimiento = { id: 'm_'+Date.now(), fecha: new Date().toISOString(), monto: m, tipo: tipo, descripcion: d };
+            user.movimientos.push(movimiento);
+            saveUser(user);
+            renderAll(true);
+            wrapper.remove();
+            // small glow animation
+            const svg = document.getElementById('progressSvg');
+            svg.animate([{transform:'scale(1)'},{transform:'scale(1.02)'},{transform:'scale(1)'}],{duration:450});
+          };
+        });
+      }
+
+      // Set target modal
+      function setTarget(){
+        const user = getActiveUser();
+        const html = `
+          <h3>Ajustar objetivos</h3>
+          <div class="field"><label>Objetivo diario</label><input id="tday" type="number" value="${user.targets?.day || DEFAULT_TARGETS.day}" /></div>
+          <div class="field"><label>Objetivo semanal</label><input id="tweek" type="number" value="${user.targets?.week || DEFAULT_TARGETS.week}" /></div>
+          <div class="field"><label>Objetivo mensual</label><input id="tmonth" type="number" value="${user.targets?.month || DEFAULT_TARGETS.month}" /></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn-ghost" id="cancelBtn">Cancelar</button><button class="btn-gold" id="saveBtn">Guardar</button></div>
+        `;
+        openModal(html,(wrapper)=>{
+          wrapper.querySelector('#cancelBtn').onclick = ()=> wrapper.remove();
+          wrapper.querySelector('#saveBtn').onclick = ()=>{
+            const tday = Number(wrapper.querySelector('#tday').value) || DEFAULT_TARGETS.day;
+            const tweek = Number(wrapper.querySelector('#tweek').value) || DEFAULT_TARGETS.week;
+            const tmonth = Number(wrapper.querySelector('#tmonth').value) || DEFAULT_TARGETS.month;
+            const user = getActiveUser();
+            user.targets = { day: tday, week: tweek, month: tmonth };
+            saveUser(user);
+            renderAll();
+            wrapper.remove();
+          };
+        });
+      }
+
+      // Import JSON
+      function importJSON(){
+        const html = `
+          <h3>Importar resumen JSON</h3>
+          <div class="field"><label>Pega aquí el JSON exportado</label><textarea id="jsonData" style="min-height:120px;background:rgba(255,255,255,0.02);color:#eee;border-radius:8px;padding:8px;border:1px solid rgba(255,255,255,0.03)"></textarea></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn-ghost" id="cancelBtn">Cancelar</button><button class="btn-gold" id="impBtn">Importar</button></div>
+        `;
+        openModal(html,{onReady:(wrapper)=>{
+          wrapper.querySelector('#cancelBtn').onclick = ()=> wrapper.remove();
+          wrapper.querySelector('#impBtn').onclick = ()=>{
+            let raw = wrapper.querySelector('#jsonData').value;
+            try{
+              const data = JSON.parse(raw);
+              const user = getActiveUser();
+              if(Array.isArray(data.movimientos)){
+                data.movimientos.forEach(m=>{
+                  if(m.id && m.monto && m.fecha){
+                    user.movimientos.push(m);
+                  }
+                });
+                saveUser(user);
+                renderAll();
+                wrapper.remove();
+                alert('Importado con éxito');
+              } else {
+                alert('JSON inválido: debe contener un array "movimientos"');
+              }
+            }catch(e){
+              alert('JSON inválido');
+            }
+          };
+        }});
+      }
+
+      // Export user backup
+      function exportBackup(){
+        const user = getActiveUser();
+        const dataStr = JSON.stringify(user, null, 2);
+        const blob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `wallet_${user.id}_backup.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      // Clear all movimientos
+      function clearAll(){
+        if(!confirm('Borrar todos los movimientos?')) return;
+        const user = getActiveUser();
+        user.movimientos = [];
+        saveUser(user);
+        renderAll();
+      }
+
+      // Confetti simple
+      const confettiCanvas = document.getElementById('confettiCanvas');
+      confettiCanvas.width = confettiCanvas.clientWidth || 320;
+      confettiCanvas.height = confettiCanvas.clientHeight || 320;
+      const ctx = confettiCanvas.getContext('2d');
+      let confettiPieces = [];
+
+      function fireConfetti(){
+        // create small burst
+        for(let i=0;i<40;i++){
+          confettiPieces.push({
+            x: 160,
+            y: 160,
+            vx: (Math.random()-0.5)*6,
+            vy: Math.random()*-6 - 2,
+            r: Math.random()*6+3,
+            c: i%2? '#ffd86b' : '#ffcc47',
+            lifetime: 0
+          });
+        }
+        animateConfetti();
+      }
+      let confettiAnim = null;
+      function animateConfetti(){
+        if(confettiAnim) return;
+        confettiAnim = requestAnimationFrame(function frame(){
+          ctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+          confettiPieces.forEach(p=>{
+            p.vy += 0.18; p.x += p.vx; p.y += p.vy; p.lifetime++;
+            ctx.fillStyle = p.c;
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, p.r, p.r*0.7, Math.random()*Math.PI, 0, Math.PI*2);
+            ctx.fill();
+          });
+          confettiPieces = confettiPieces.filter(p=> p.y < confettiCanvas.height + 50 && p.lifetime < 200);
+          if(confettiPieces.length) confettiAnim = requestAnimationFrame(frame); else { cancelAnimationFrame(confettiAnim); confettiAnim = null; }
+        });
+      }
+
+      // QR params handler
+      function handleQRParams(){
+        const params = new URLSearchParams(location.search);
+        const garzon = params.get('garzon');
+        const monto = params.get('monto');
+        const fecha = params.get('fecha');
+        if(garzon && monto){
+          let users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+          let user = users.find(u=>u.id.toLowerCase() === garzon.toLowerCase() || u.name.toLowerCase()===garzon.toLowerCase());
+          if(!user){
+            if(confirm('Crear billetera para '+garzon+'?')){
+              user = { id: garzon.toLowerCase(), name: garzon, pin: null, movimientos:[], targets: DEFAULT_TARGETS };
+              users.push(user);
+              localStorage.setItem(USERS_LIST, JSON.stringify(users));
+            } else return;
+          }
+          localStorage.setItem(USER_KEY, user.id);
+          if(confirm(`¿Agregar ${formatMoney(Number(monto))} al balance de ${user.name}?`)){
+            const movimiento = { id: 'qr_'+Date.now(), fecha: fecha || new Date().toISOString(), monto: Number(monto), tipo:'ingreso', descripcion:'Importado QR' };
+            user.movimientos.push(movimiento);
+            saveUser(user);
+            history.replaceState({}, '', location.pathname);
+            renderAll();
+            alert('Ingreso agregado desde QR');
+          }
+        }
+      }
+
+      // Initialize
+      initSample();
+      setTimeout(()=>{ loadLoginUsers(); }, 300);  // FIX DEFINITIVO
+      renderAll(false);
+      handleQRParams();
+
+      // Events
+      document.querySelectorAll('.seg button').forEach(b=>{
+        b.onclick = ()=> {
+          document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('active'));
+          b.classList.add('active');
+          currentMode = b.dataset.mode;
+          renderAll();
+        };
+      });
+      $('#btnAdd').onclick = ()=> addMovimiento('ingreso');
+      $('#btnRetiro').onclick = ()=> addMovimiento('retiro');
+      $('#btnSetTarget').onclick = ()=> setTarget();
+      $('#btnImport').onclick = ()=> importJSON();
+      $('#btnExport').onclick = ()=> exportBackup();
+      $('#btnClear').onclick = ()=> clearAll();
+
+      // ensure responsive canvas sizes when resized
+      function resizeCanvas(){
+        confettiCanvas.width = confettiCanvas.clientWidth || 320;
+        confettiCanvas.height = confettiCanvas.clientHeight || 320;
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      // small entrance animation
+      document.querySelector('.meter').animate([{transform:'translateY(20px)',opacity:0},{transform:'translateY(0)',opacity:1}],{duration:650,easing:'cubic-bezier(.2,.9,.3,1)'});
+    </script>
+  </div>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+// --- Lector QR / Propina automática para Wallet ILUX ---
+
+function handleQRParamsFromString(url) {
+    try {
+        const parsed = new URL(url);
+        const params = new URLSearchParams(parsed.search);
+
+        const garzon = params.get("garzon");
+        const monto = params.get("monto");
+        const fecha = params.get("fecha") || new Date().toISOString();
+
+        if (!garzon || !monto) {
+            alert("El QR no contiene datos válidos.");
+            return;
+        }
+
+        let users = JSON.parse(localStorage.getItem(USERS_LIST) || "[]");
+        let user = users.find(u => u.id.toLowerCase() === garzon.toLowerCase());
+
+        if (!user) {
+            user = { 
+                id: garzon.toLowerCase(), 
+                name: garzon, 
+                pin: null, 
+                movimientos: [],
+                targets: DEFAULT_TARGETS
+            };
+            users.push(user);
+        }
+
+        const movimiento = {
+            id: "qr_" + Date.now(),
+            fecha: fecha,
+            monto: Number(monto),
+            tipo: "ingreso",
+            descripcion: "Propina QR"
+        };
+
+        user.movimientos.push(movimiento);
+        localStorage.setItem(USERS_LIST, JSON.stringify(users));
+        localStorage.setItem(USER_KEY, user.id);
+
+        renderAll(true);
+        alert("Propina agregada con éxito desde QR");
+
+    } catch (e) {
+        alert("Error al interpretar el QR");
+    }
+}
+
+function openQRScanner() {
+    const modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.innerHTML = `
+      <div class="modal">
+        <h3>Escanear QR</h3>
+        <div id="qr-reader" style="width:100%;"></div>
+        <div style="display:flex;justify-content:end;margin-top:10px">
+            <button class="btn-gold" id="closeQR">Cerrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    let qrScanner = new Html5Qrcode("qr-reader");
+
+    qrScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 230 },
+        qrText => {
+            qrScanner.stop();
+            modal.remove();
+            handleQRParamsFromString(qrText);
+        },
+        () => {}
+    );
+
+    document.getElementById("closeQR").onclick = () => {
+        qrScanner.stop();
+        modal.remove();
+    };
+}
+
+document.getElementById("btnScanQR").onclick = openQRScanner;
+</script>
+	<script>
+// --- FUNCIÓN DEFINITIVA PARA GENERAR EL QR CORRECTO ---
+function buildUrl(name, amt){
+  const garzon = encodeURIComponent(name);
+  const monto = Number(amt) || 0;
+  const fecha = encodeURIComponent(new Date().toISOString());
+
+  return 'https://hayladan.github.io/wallet-ilux/wallet_ilux_propina_meter.html'
+    + '?garzon=' + garzon
+    + '&monto=' + monto
+    + '&fecha=' + fecha;
+}
+//------------------------------------------------------
+// LOGIN + PIN
+//------------------------------------------------------
+
+// Cargar usuarios en el selector de login
+function loadLoginUsers(){
+  const users = JSON.parse(localStorage.getItem('wallet_users') || '[]');
+  const sel = document.getElementById('loginUser');
+  sel.innerHTML = '';
+  users.forEach(u=>{
+    const op = document.createElement('option');
+    op.value = u.id;
+    op.textContent = u.name;
+    sel.appendChild(op);
+  });
+}
+
+// Validar PIN
+document.getElementById('btnLogin').onclick = function(){
+  const uid = loginUser.value;
+  const pin = loginPin.value.trim();
+  if(!pin || pin.length < 4){
+    loginError.textContent = "PIN debe tener 4 dígitos";
+    loginError.style.display = 'block';
+    return;
+  }
+
+  let users = JSON.parse(localStorage.getItem('wallet_users') || '[]');
+  let user = users.find(u => u.id === uid);
+
+  if(!user) return;
+
+  // Si no tiene PIN → crear por primera vez
+  if(!user.pin){
+    user.pin = pin;
+    localStorage.setItem('wallet_users', JSON.stringify(users));
+    localStorage.setItem('wallet_active_user', uid);
+    document.getElementById('loginScreen').style.display = 'none';
+    renderAll(true);
+    return;
+  }
+
+  // Si PIN existe → validar
+  if(user.pin !== pin){
+    loginError.textContent = "PIN incorrecto";
+    loginError.style.display = 'block';
+    return;
+  }
+
+  // PIN correcto
+  localStorage.setItem('wallet_active_user', uid);
+  document.getElementById('loginScreen').style.display = 'none';
+  renderAll(true);
+};
+</script>
+<script>
+document.getElementById("btnLogout").onclick = function () {
+    // eliminar usuario activo
+    localStorage.removeItem("wallet_active_user");
+
+    // limpiar campo PIN
+    document.getElementById("loginPin").value = "";
+
+    // ocultar error anterior si existía
+    document.getElementById("loginError").style.display = "none";
+
+    // mostrar login nuevamente
+    document.getElementById("loginScreen").style.display = "flex";
+
+    // refrescar selector de usuarios
+    loadLoginUsers();
+};
+</script>
+</body>
+</html>
