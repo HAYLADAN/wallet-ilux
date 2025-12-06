@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="es">
 <head>
@@ -84,9 +85,11 @@
   </style>
 </head>
 <body>
+<!-- LOGIN SCREEN -->
 <div id="loginScreen" style="
   position:fixed; inset:0; background:#000; display:flex;
   align-items:center; justify-content:center; z-index:9999;">
+  
   <div style="background:#111; padding:20px; border-radius:10px;
     width:90%; max-width:350px; text-align:center;">
     
@@ -96,7 +99,7 @@
     <select id="loginUser" style="width:100%; padding:10px; margin-bottom:10px;"></select>
 
     <label style="color:#bbb;">PIN</label>
-    <input id="loginPin" type="password" maxlength="4" 
+    <input id="loginPin" type="password" maxlength="4"
       style="width:100%; padding:10px; margin-bottom:15px; text-align:center; font-size:18px;" />
 
     <button id="btnLogin" style="width:100%; padding:12px; background:#ffd86b; color:#000; border:0; border-radius:8px;">
@@ -107,6 +110,8 @@
       PIN incorrecto
     </p>
   </div>
+</div>
+<!-- 🚨 CIERRE DEL LOGIN AQUÍ 🚨 -->
 
   <div class="app" id="app">
     <header>
@@ -117,7 +122,9 @@
           <div class="sub">Propina Meter • Círculo dinámico</div>
         </div>
       </div>
-      <div class="sub">Offline • localStorage</div>
+      <button id="btnLogout" class="btn-ghost" style="padding:6px 12px;font-size:12px;">
+  Cerrar sesión
+</button>
     </header>
 
     <main class="grid">
@@ -230,24 +237,38 @@
 
       // Initialize sample user
       function initSample(){
-        let users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
-        if(!users.length){
-          const defaultUser = {
-            id: 'javier',
-            name: 'Javier',
-            pin: null,
-            movimientos: [
-              {id: 'm1', fecha: new Date().toISOString(), monto: 8500, tipo: 'ingreso', descripcion: 'Propina QR'},
-              {id: 'm2', fecha: new Date(Date.now()-86400000).toISOString(), monto: 3000, tipo: 'ingreso', descripcion: 'Aporte meta'},
-              {id: 'm3', fecha: new Date(Date.now()-2*86400000).toISOString(), monto: 2000, tipo: 'retiro', descripcion: 'Colación'}
-            ],
-            targets: DEFAULT_TARGETS
-          };
-          users.push(defaultUser);
-          localStorage.setItem(USERS_LIST, JSON.stringify(users));
-          localStorage.setItem(USER_KEY, defaultUser.id);
-        }
-      }
+  let users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+
+  // Si nunca se creó una base de datos, crear todos los colaboradores
+  if(!users.length){
+    const baseUsers = [
+      { id: "fernando", name: "Fernando" },
+      { id: "javier", name: "Javier" },
+      { id: "jose", name: "José" },
+
+      { id: "andres_bartender", name: "Andrés (Bartender)" },
+
+      { id: "ramon", name: "Ramón" },
+      { id: "manuela", name: "Manuela" },
+
+      { id: "johana", name: "Johana" },
+      { id: "andreina", name: "Andreina" },
+      { id: "marialba", name: "Marialba" },
+
+      { id: "andres_copero", name: "Andrés (Copero)" }
+    ];
+
+    users = baseUsers.map(u => ({
+      ...u,
+      pin: null,
+      movimientos: [],
+      targets: DEFAULT_TARGETS
+    }));
+
+    localStorage.setItem(USERS_LIST, JSON.stringify(users));
+    localStorage.setItem(USER_KEY, users[0].id);
+  }
+}
 
       function getActiveUser(){
         const uid = localStorage.getItem(USER_KEY);
@@ -536,6 +557,7 @@
 
       // Initialize
       initSample();
+      setTimeout(()=>{ loadLoginUsers(); }, 300);  // FIX DEFINITIVO
       renderAll(false);
       handleQRParams();
 
@@ -720,15 +742,24 @@ document.getElementById('btnLogin').onclick = function(){
   document.getElementById('loginScreen').style.display = 'none';
   renderAll(true);
 };
+</script>
+<script>
+document.getElementById("btnLogout").onclick = function () {
+    // eliminar usuario activo
+    localStorage.removeItem("wallet_active_user");
 
-// Si ya hay un usuario logueado → saltarse login
-(function(){
-  const uid = localStorage.getItem('wallet_active_user');
-  if(uid){
-    document.getElementById('loginScreen').style.display = 'none';
-  }
-  loadLoginUsers();
-})();
+    // limpiar campo PIN
+    document.getElementById("loginPin").value = "";
+
+    // ocultar error anterior si existía
+    document.getElementById("loginError").style.display = "none";
+
+    // mostrar login nuevamente
+    document.getElementById("loginScreen").style.display = "flex";
+
+    // refrescar selector de usuarios
+    loadLoginUsers();
+};
 </script>
 </body>
 </html>
