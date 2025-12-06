@@ -84,6 +84,30 @@
   </style>
 </head>
 <body>
+<div id="loginScreen" style="
+  position:fixed; inset:0; background:#000; display:flex;
+  align-items:center; justify-content:center; z-index:9999;">
+  <div style="background:#111; padding:20px; border-radius:10px;
+    width:90%; max-width:350px; text-align:center;">
+    
+    <h2 style="margin-bottom:10px;">Ingresar a Wallet ILUX</h2>
+
+    <label style="color:#bbb;">Usuario</label>
+    <select id="loginUser" style="width:100%; padding:10px; margin-bottom:10px;"></select>
+
+    <label style="color:#bbb;">PIN</label>
+    <input id="loginPin" type="password" maxlength="4" 
+      style="width:100%; padding:10px; margin-bottom:15px; text-align:center; font-size:18px;" />
+
+    <button id="btnLogin" style="width:100%; padding:12px; background:#ffd86b; color:#000; border:0; border-radius:8px;">
+      Entrar
+    </button>
+
+    <p id="loginError" style="color:#ff7676; margin-top:10px; display:none;">
+      PIN incorrecto
+    </p>
+  </div>
+
   <div class="app" id="app">
     <header>
       <div class="brand">
@@ -642,6 +666,69 @@ function buildUrl(name, amt){
     + '&monto=' + monto
     + '&fecha=' + fecha;
 }
+//------------------------------------------------------
+// LOGIN + PIN
+//------------------------------------------------------
+
+// Cargar usuarios en el selector de login
+function loadLoginUsers(){
+  const users = JSON.parse(localStorage.getItem('wallet_users') || '[]');
+  const sel = document.getElementById('loginUser');
+  sel.innerHTML = '';
+  users.forEach(u=>{
+    const op = document.createElement('option');
+    op.value = u.id;
+    op.textContent = u.name;
+    sel.appendChild(op);
+  });
+}
+
+// Validar PIN
+document.getElementById('btnLogin').onclick = function(){
+  const uid = loginUser.value;
+  const pin = loginPin.value.trim();
+  if(!pin || pin.length < 4){
+    loginError.textContent = "PIN debe tener 4 dígitos";
+    loginError.style.display = 'block';
+    return;
+  }
+
+  let users = JSON.parse(localStorage.getItem('wallet_users') || '[]');
+  let user = users.find(u => u.id === uid);
+
+  if(!user) return;
+
+  // Si no tiene PIN → crear por primera vez
+  if(!user.pin){
+    user.pin = pin;
+    localStorage.setItem('wallet_users', JSON.stringify(users));
+    localStorage.setItem('wallet_active_user', uid);
+    document.getElementById('loginScreen').style.display = 'none';
+    renderAll(true);
+    return;
+  }
+
+  // Si PIN existe → validar
+  if(user.pin !== pin){
+    loginError.textContent = "PIN incorrecto";
+    loginError.style.display = 'block';
+    return;
+  }
+
+  // PIN correcto
+  localStorage.setItem('wallet_active_user', uid);
+  document.getElementById('loginScreen').style.display = 'none';
+  renderAll(true);
+};
+
+// Si ya hay un usuario logueado → saltarse login
+(function(){
+  const uid = localStorage.getItem('wallet_active_user');
+  if(uid){
+    document.getElementById('loginScreen').style.display = 'none';
+  }
+  loadLoginUsers();
+})();
 </script>
 </body>
 </html>
