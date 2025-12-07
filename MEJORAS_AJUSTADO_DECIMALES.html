@@ -102,6 +102,19 @@
   <script>
     const USERS_LIST = 'wallet_users';
     const USER_KEY = 'wallet_active_user';
+    // --- LECTURA DE PARAMETROS DEL QR ---
+    const qp = new URLSearchParams(window.location.search);
+    const qrTipo  = qp.get("tipo");    // ingreso | pago
+        procesarRetiro(qrNombre, qrMonto, qrFecha);
+    }
+    
+    // --- PROCESAR QR DE PAGO (RETIRO) ---
+    if (qrTipo === "pago" && qrNombre && qrMonto > 0) {
+    procesarRetiro(qrNombre, qrMonto, qrFecha);
+    }    
+    const qrMonto = Number(qp.get("monto") || 0);
+    const qrFecha = qp.get("fecha") || new Date().toISOString();
+    const qrNombre = qp.get("garzon");
     const $ = (s) => document.querySelector(s);
     const esc = encodeURIComponent;
 
@@ -270,8 +283,33 @@
       wrapper.innerHTML = `<div class="modal">${html}</div>`;
       wrapper.addEventListener('click', (e)=>{ if(e.target===wrapper) wrapper.remove(); });
       root.appendChild(wrapper);
+    }):
+      function procesarRetiro(nombre, monto, fecha){
+    let users = JSON.parse(localStorage.getItem("wallet_users") || "[]");
+
+    let user = users.find(u => u.name.toLowerCase() === nombre.toLowerCase());
+
+    if(!user){
+        alert("No se encontró la cuenta del colaborador: " + nombre);
+        return;
     }
 
+    const mov = {
+        id: "pago_" + Date.now(),
+        fecha: fecha,
+        monto: monto,
+        tipo: "retiro",
+        descripcion: "Pago semanal"
+    };
+
+    user.movimientos.push(mov);
+    localStorage.setItem("wallet_users", JSON.stringify(users));
+
+    alert("Pago semanal registrado: $" + monto.toLocaleString("es-CL"));
+
+    renderMovimientos();
+    renderBalance();
+}
     initSampleIfEmpty();
     loadGarzones();
     renderPreview();
