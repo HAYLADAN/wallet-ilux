@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="es">
 <head>
@@ -35,6 +36,20 @@
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1200}
     .modal{width:340px;background:linear-gradient(180deg,#0f0f10,#0b0b0b);padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.04)}
     .hint{font-size:13px;color:var(--muted);margin-top:8px}
+
+    /* historial */
+    .mov-item{
+      padding:10px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.06);
+      border-radius:10px;
+      margin-bottom:8px;
+      font-size:13px;
+    }
+    .monto-pos{ color:#7bff8d; font-weight:700 }
+    .monto-neg{ color:#ff7b7b; font-weight:700 }
+    .fecha{ color:var(--muted); font-size:11px }
+
     @media (max-width:900px){ .grid{grid-template-columns:1fr;} }
   </style>
 </head>
@@ -60,7 +75,7 @@
         </div>
 
         <div style="margin-top:12px">
-          <label for="customAmount">Monto a entregar (CLP)</label>
+          <label for="customAmount">Monto (CLP)</label>
           <input id="customAmount" type="number" value="1000" />
           <div class="presets" aria-hidden="false">
             <button class="btn btn-ghost" data-amt="1000">1.000</button>
@@ -73,16 +88,22 @@
 
         <div class="actions">
           <button id="btnGenerate" class="btn btn-gold">Generar QR de entrega</button>
+          <button id="btnPay" class="btn btn-ghost">Pagar (descontar)</button>
           <button id="btnQuick" class="btn btn-ghost">Entregar rápido</button>
         </div>
-
-        <div class="hint">El QR generado contiene una URL que el garzón puede escanear para recibir el monto directamente en su Wallet ILUX.</div>
-
+        <div class="hint">El QR generado contiene una URL que aplica el movimiento en la Wallet ILUX.</div>
         <div class="footer">Admin ILUX — Generado</div>
       </section>
 
+    <!-- historial -->
+   	<section id="historyPanel" class="panel" style="margin-top:12px; width:420px; margin-left:auto;">
+ 	<h4>Historial</h4>
+ 	<div id="historyBox" style="max-height:260px; overflow-y:auto;"></div>
+     </section>
+
+
       <aside class="panel">
-        <h4>Vista previa de transferencia</h4>
+        <h4>Vista previa</h4>
         <div style="margin-top:10px" class="qr-preview" id="previewBox">
           <div class="small">Garzón: <strong id="pvName">—</strong></div>
           <div class="small">Monto: <strong id="pvAmt">—</strong></div>
@@ -102,21 +123,7 @@
   <script>
     const USERS_LIST = 'wallet_users';
     const USER_KEY = 'wallet_active_user';
-    // --- LECTURA DE PARAMETROS DEL QR ---
-    const qp = new URLSearchParams(window.location.search);
-    const qrTipo  = qp.get("tipo");    // ingreso | pago
-        procesarRetiro(qrNombre, qrMonto, qrFecha);
-    }
-    
-    // --- PROCESAR QR DE PAGO (RETIRO) ---
-    if (qrTipo === "pago" && qrNombre && qrMonto > 0) {
-    procesarRetiro(qrNombre, qrMonto, qrFecha);
-    }    
-    const qrMonto = Number(qp.get("monto") || 0);
-    const qrFecha = qp.get("fecha") || new Date().toISOString();
-    const qrNombre = qp.get("garzon");
     const $ = (s) => document.querySelector(s);
-    const esc = encodeURIComponent;
 
     function initSampleIfEmpty(){
       let users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
@@ -146,7 +153,7 @@
       sel.appendChild(manual);
       sel.onchange = handleSelectChange;
       if(sel.options.length) sel.selectedIndex = 0;
-      renderPreview();
+      renderPreview("ingreso");
     }
 
     function handleSelectChange(){
@@ -165,7 +172,8 @@
           sel.selectedIndex = 0;
         }
       }
-      renderPreview();
+      renderPreview("ingreso");
+      renderHistory();
     }
 
     function getSelectedName(){
@@ -181,99 +189,113 @@
       return u ? u.name : val;
     }
 
-    function renderPreview(){
-      const name = getSelectedName() || '—';
-      const amt = Number($('#customAmount').value) || 0;
-      $('#pvName').textContent = name;
-      $('#pvAmt').textContent = '$ ' + amt.toLocaleString('es-CL');
-      const url = buildUrl(name, amt);
-      $('#pvUrl').textContent = url;
-      renderQr(url);
-    }
-
-    function buildUrl(name, amt){
+    function buildUrl(name, amt, tipo){
       const garzon = encodeURIComponent(name);
       const monto = Number(amt) || 0;
       const fecha = encodeURIComponent(new Date().toISOString());
-  
+      const t = tipo === "egreso" ? "egreso" : "ingreso";
+
       return 'https://hayladan.github.io/wallet-ilux/wallet_ilux_propina_meter.html'
           + '?garzon=' + garzon
           + '&monto=' + monto
+          + '&tipo=' + t
           + '&fecha=' + fecha;
+    }
+
+    function renderPreview(tipo){
+      const name = getSelectedName() || '—';
+      let amt = Number($('#customAmount').value) || 0;
+      if(tipo === "egreso") amt = -Math.abs(amt);
+
+      $('#pvName').textContent = name;
+      $('#pvAmt').textContent = '$ ' + amt.toLocaleString('es-CL');
+
+      const url = buildUrl(name, amt, tipo);
+      $('#pvUrl').textContent = url;
+      renderQr(url);
     }
 
     function renderQr(url){
       const qrArea = $('#qrArea');
       qrArea.innerHTML = '';
       const img = document.createElement('img');
-      img.alt = 'QR de transferencia';
+      img.alt = 'QR';
       img.style.width = '220px';
       img.style.height = '220px';
       img.style.borderRadius = '8px';
-      const api = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
-      img.src = api;
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
       qrArea.appendChild(img);
+    }
+
+    /* -----------------------------
+          HISTORIAL
+    ------------------------------*/
+    function saveMovement(name, amount, type){
+      const users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+      const u = users.find(x => x.name === name);
+      if(!u) return;
+
+      u.movimientos = u.movimientos || [];
+
+      u.movimientos.unshift({
+        fecha: new Date().toLocaleString('es-CL'),
+        tipo: type,
+        monto: amount,
+	nombre: name
+      });
+
+      u.movimientos = u.movimientos.slice(0, 20);
+      localStorage.setItem(USERS_LIST, JSON.stringify(users));
+    }
+
+    function renderHistory(){
+      const box = document.getElementById("historyBox");
+      box.innerHTML = "";
+
+      const name = getSelectedName();
+      if(!name) return;
+
+      const users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
+      const u = users.find(x => x.name === name);
+      if(!u || !u.movimientos || !u.movimientos.length){
+        box.innerHTML = "<div class='small'>Sin movimientos aún.</div>";
+        return;
+      }
+
+      u.movimientos.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "mov-item";
+        div.innerHTML = `
+          <div><strong>${m.tipo === "ingreso" ? "Ingreso" : "Egreso"}</strong></div>
+  	  <div>Colaborador: <strong>${m.nombre || name}</strong></div>
+          <div class="${m.monto > 0 ? "monto-pos" : "monto-neg"}">
+            ${m.monto > 0 ? "+" : ""}$ ${m.monto.toLocaleString('es-CL')}
+          </div>
+          <div class="fecha">${m.fecha}</div>`;
+        box.appendChild(div);
+      });
     }
 
     document.querySelectorAll('.presets button').forEach(b=>{
       b.addEventListener('click', ()=> {
-        const amt = Number(b.dataset.amt);
-        $('#customAmount').value = amt;
-        renderPreview();
+        $('#customAmount').value = Number(b.dataset.amt);
+        renderPreview("ingreso");
       });
     });
 
-    $('#customAmount').addEventListener('input', renderPreview);
-    $('#garzonSelect').addEventListener('change', renderPreview);
+    $('#customAmount').addEventListener('input', ()=>renderPreview("ingreso"));
+    $('#garzonSelect').addEventListener('change', ()=>{
+      renderPreview("ingreso");
+      renderHistory();
+    });
 
     $('#btnCopy').addEventListener('click', ()=>{
       const url = $('#pvUrl').textContent;
-      navigator.clipboard?.writeText(url).then(()=> alert('Enlace copiado al portapapeles'), ()=> alert('No se pudo copiar'));
+      navigator.clipboard?.writeText(url).then(()=> alert('Enlace copiado'), ()=> alert('No se pudo copiar'));
     });
     $('#btnOpen').addEventListener('click', ()=>{
       const url = $('#pvUrl').textContent;
       window.open(url, '_blank');
-    });
-
-    $('#btnGenerate').addEventListener('click', ()=>{
-      const name = getSelectedName();
-      const amt = Number($('#customAmount').value) || 0;
-      if(!name || amt <= 0){ alert('Selecciona un garzón y un monto válido'); return; }
-      const url = buildUrl(name, amt);
-      openModal(`<h3>QR de entrega</h3>
-        <div style="text-align:center;margin-top:10px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}" alt="QR" style="width:260px;height:260px;border-radius:10px" /></div>
-        <div class="small" style="margin-top:10px">Garzón: <strong>${name}</strong></div>
-        <div class="small">Monto: <strong>$ ${amt.toLocaleString('es-CL')}</strong></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-          <button class="btn btn-ghost" id="closeModal">Cerrar</button>
-          <button class="btn btn-gold" id="copyModal">Copiar enlace</button>
-        </div>`);
-      const modal = document.querySelector('.modal-backdrop');
-      modal.querySelector('#closeModal').onclick = ()=> modal.remove();
-      modal.querySelector('#copyModal').onclick = ()=>{
-        navigator.clipboard?.writeText(url).then(()=> alert('Enlace copiado'), ()=> alert('No se pudo copiar'));
-      };
-    });
-
-    $('#btnQuick').addEventListener('click', ()=>{
-      const sel = $('#garzonSelect');
-      const name = getSelectedName();
-      const amt = Number($('#customAmount').value) || 0;
-      if(!name || amt <= 0){ alert('Selecciona un garzón y un monto válido'); return; }
-
-      let users = JSON.parse(localStorage.getItem(USERS_LIST) || '[]');
-      let user = users.find(u => u.id === sel.value);
-      if(!user || sel.value.startsWith('tmp_')){
-        const uid = (sel.value && !sel.value.startsWith('tmp_')) ? sel.value.toLowerCase() : name.toLowerCase().replace(/\s+/g,'_') + '_' + Date.now();
-        user = { id: uid, name: name, pin: null, movimientos: [], targets: {} };
-        users.push(user);
-      }
-      const movimiento = { id: 'admin_'+Date.now(), fecha: new Date().toISOString(), monto: Number(amt), tipo: 'ingreso', descripcion: 'Entrega Admin (rápido)' };
-      user.movimientos = user.movimientos || [];
-      user.movimientos.push(movimiento);
-      localStorage.setItem(USERS_LIST, JSON.stringify(users));
-      alert('Entrega registrada localmente en la billetera de ' + name);
-      renderPreview();
     });
 
     function openModal(html){
@@ -283,36 +305,66 @@
       wrapper.innerHTML = `<div class="modal">${html}</div>`;
       wrapper.addEventListener('click', (e)=>{ if(e.target===wrapper) wrapper.remove(); });
       root.appendChild(wrapper);
-    }):
-      function procesarRetiro(nombre, monto, fecha){
-    let users = JSON.parse(localStorage.getItem("wallet_users") || "[]");
-
-    let user = users.find(u => u.name.toLowerCase() === nombre.toLowerCase());
-
-    if(!user){
-        alert("No se encontró la cuenta del colaborador: " + nombre);
-        return;
     }
 
-    const mov = {
-        id: "pago_" + Date.now(),
-        fecha: fecha,
-        monto: monto,
-        tipo: "retiro",
-        descripcion: "Pago semanal"
-    };
+    // GENERAR QR INGRESO
+    $('#btnGenerate').addEventListener('click', ()=>{
+      const name = getSelectedName();
+      const amt = Number($('#customAmount').value)||0;
+      if(!name || amt<=0){ alert('Selecciona garzón y monto válido'); return; }
 
-    user.movimientos.push(mov);
-    localStorage.setItem("wallet_users", JSON.stringify(users));
+      const url = buildUrl(name, amt, "ingreso");
 
-    alert("Pago semanal registrado: $" + monto.toLocaleString("es-CL"));
+      saveMovement(name, amt, "ingreso");
+      renderHistory();
 
-    renderMovimientos();
-    renderBalance();
-}
+      openModal(`
+        <h3>QR de entrega</h3>
+        <div style="text-align:center;margin-top:10px">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}" style="width:260px;height:260px;border-radius:10px"/>
+        </div>
+        <div class="small" style="margin-top:10px">Garzón: <strong>${name}</strong></div>
+        <div class="small">Monto: <strong>$ ${amt.toLocaleString('es-CL')}</strong></div>
+        <button class="btn btn-gold" id="copyModal">Copiar enlace</button>
+        <button class="btn btn-ghost" id="closeModal">Cerrar</button>`);
+
+      const modal=document.querySelector('.modal-backdrop');
+      modal.querySelector('#closeModal').onclick=()=>modal.remove();
+      modal.querySelector('#copyModal').onclick=()=>navigator.clipboard?.writeText(url);
+    });
+
+    // BOTÓN PAGAR (EGRESO)
+    $('#btnPay').addEventListener('click', ()=>{
+      const name = getSelectedName();
+      let amt = Number($('#customAmount').value)||0;
+      if(!name || amt<=0){ alert('Selecciona garzón y monto válido'); return; }
+
+      amt = -Math.abs(amt);
+      const url = buildUrl(name, amt, "egreso");
+
+      saveMovement(name, amt, "egreso");
+      renderHistory();
+
+      openModal(`
+        <h3>QR de pago (descuento)</h3>
+        <div style="text-align:center;margin-top:10px">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}" style="width:260px;height:260px;border-radius:10px"/>
+        </div>
+        <div class="small" style="margin-top:10px">Garzón: <strong>${name}</strong></div>
+        <div class="small">Monto descontado: <strong>$ ${amt.toLocaleString('es-CL')}</strong></div>
+        <button class="btn btn-gold" id="copyModal">Copiar enlace</button>
+        <button class="btn btn-ghost" id="closeModal">Cerrar</button>`);
+
+      const modal=document.querySelector('.modal-backdrop');
+      modal.querySelector('#closeModal').onclick=()=>modal.remove();
+      modal.querySelector('#copyModal').onclick=()=>navigator.clipboard?.writeText(url);
+
+      renderPreview("egreso");
+    });
+
     initSampleIfEmpty();
     loadGarzones();
-    renderPreview();
+    renderHistory();
   </script>
 </body>
 </html>
