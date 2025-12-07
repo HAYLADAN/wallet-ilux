@@ -86,8 +86,8 @@
       .meter{width:260px;height:260px}
     }
 
-    /* ============================
-   REORDENAR PARA MÓVILES
+  /* ============================
+   REORDENAR LA WALLET EN MÓVILES
    ============================ */
 
 @media (max-width: 768px) {
@@ -98,14 +98,15 @@
     max-width: 100%;
   }
 
-  /* El grid pasa a una sola columna */
+  /* Cambiar GRID a formato vertical */
   .grid {
-    display: flex;
-    flex-direction: column;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 20px;
+    width: 100%;
   }
 
-  /* El panel del círculo SIEMPRE arriba */
+  /* Panel del círculo ARRIBA */
   .circle-panel {
     order: 1;
     width: 100%;
@@ -113,21 +114,22 @@
     justify-content: center;
   }
 
-  /* Movimientos debajo del círculo */
+  /* Últimos movimientos DEBAJO */
   aside {
     order: 2;
     width: 100%;
   }
 
-  /* Ajuste visual del círculo */
+  /* Ajuste del círculo para móvil */
   .meter {
-    width: 220px;
-    height: 220px;
+    width: 220px !important;
+    height: 220px !important;
   }
 }
 
-/* Para teléfonos realmente pequeños */
+/* Teléfonos realmente pequeños */
 @media (max-width: 480px) {
+
   .meter {
     width: 180px !important;
     height: 180px !important;
@@ -136,6 +138,17 @@
   header {
     flex-direction: column;
     text-align: center;
+    gap: 10px;
+  }
+
+  .mini-stats {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .controls {
+    flex-direction: column;
+    gap: 8px;
   }
 }
   </style>
