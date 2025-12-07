@@ -81,6 +81,32 @@
       .grid{grid-template-columns:1fr;align-items:start}
       .meter{width:260px;height:260px}
     }
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr;align-items:start}
+      .meter{width:260px;height:260px}
+    }
+
+    /* ======== OPTIMIZACIÓN PARA DISPOSITIVOS MÓVILES ======== */
+    @media (max-width: 900px) {
+      body { padding: 8px; }
+      .app { width: 100%; max-width: 100%; }
+      .grid { grid-template-columns: 1fr; gap: 14px; }
+      header { flex-direction: column; text-align: center; gap: 10px; }
+      .meter { width: 230px; height: 230px; }
+      .meter-wrap { padding: 0 10px; }
+      aside { width: 100%; }
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 4px; }
+      .title { font-size: 16px; }
+      .meter { width: 190px !important; height: 190px !important; }
+      .circle-panel { padding: 12px; }
+      .controls { flex-direction: column; gap: 6px; }
+      .mini-stats { flex-direction: column; gap: 8px; }
+      .panel { padding: 10px; }
+      .movements { max-height: 260px; }
+    }
   </style>
 </head>
 <body>
